@@ -3689,6 +3689,14 @@
       "endpointId": 1,
       "networkId": 0,
       "parentEndpointIdentifier": null
+    },
+    {
+      "endpointTypeName": "Anonymous Endpoint Type",
+      "endpointTypeIndex": 1,
+      "profileId": 259,
+      "endpointId": 2,
+      "networkId": 0,
+      "parentEndpointIdentifier": null
     }
   ]
 }

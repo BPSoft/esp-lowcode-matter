@@ -43,19 +43,32 @@ int feature_update_from_system(low_code_feature_data_t *data)
     uint16_t endpoint_id = data->details.endpoint_id;
     uint32_t feature_id = data->details.feature_id;
 
+    // --- ENDPOINT 1: Lâmpada Tunable White original (Pinos 19 e 20) ---
     if (endpoint_id == 1) {
         if (feature_id == LOW_CODE_FEATURE_ID_POWER) {  // Power
             bool power_value = *(bool *)data->value.value;
-            printf("%s: Feature update: power: %d\n", TAG, power_value);
+            printf("%s: EP1 Feature update: power: %d\n", TAG, power_value);
             app_driver_set_light_state(power_value);
         } else if (feature_id == LOW_CODE_FEATURE_ID_BRIGHTNESS) {  // Brightness
             uint8_t brightness = *(uint8_t *)data->value.value;
-            printf("%s: Feature update: brightness: %d\n", TAG, brightness);
+            printf("%s: EP1 Feature update: brightness: %d\n", TAG, brightness);
             app_driver_set_light_brightness(brightness);
         } else if (feature_id == LOW_CODE_FEATURE_ID_COLOR_TEMPERATURE) {  // Color temperature
             uint16_t color_temp = *(uint16_t *)data->value.value;
-            printf("%s: Feature update: color temperature: %d\n", TAG, color_temp);
+            printf("%s: EP1 Feature update: color temperature: %d\n", TAG, color_temp);
             app_driver_set_light_temperature(color_temp);
+        }
+    }
+    // --- ENDPOINT 2: Canal C Isolado (Pino 0) ---
+    else if (endpoint_id == 2) {
+        if (feature_id == LOW_CODE_FEATURE_ID_POWER) {  // Power para o canal C
+            bool power_value = *(bool *)data->value.value;
+            printf("%s: EP2 Feature update: power: %d\n", TAG, power_value);
+            app_driver_set_c_light_state(power_value); // Nova função que vamos criar no driver
+        } else if (feature_id == LOW_CODE_FEATURE_ID_BRIGHTNESS) {  // Brightness para o canal C
+            uint8_t brightness = *(uint8_t *)data->value.value;
+            printf("%s: EP2 Feature update: brightness: %d\n", TAG, brightness);
+            app_driver_set_c_light_brightness(brightness); // Nova função que vamos criar no driver
         }
     }
 

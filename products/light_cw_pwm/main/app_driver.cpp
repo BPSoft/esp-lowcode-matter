@@ -13,61 +13,103 @@
 // limitations under the License.
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #include <light_driver.h>
+#include <led_driver.h>
 
 #include "app_priv.h"
 
-#define COLD_CHANNEL_IO ((gpio_num_t)4)
-#define WARM_CHANNEL_IO ((gpio_num_t)6)
+#define LIGHT_CW_PWM_GPIO_COLD      (gpio_num_t)19  // Main light cold white channel
+#define LIGHT_CW_PWM_GPIO_WARM      (gpio_num_t)20  // Main light warm white channel
+#define LIGHT_C_PWM_GPIO_DEDICATED  (gpio_num_t)0   // Nightlight PWM channel
 
 static const char *TAG = "app_driver";
+static bool s_night_light_on = false;
+static uint8_t s_night_light_brightness = 100;
+
+static void app_driver_update_nightlight(void)
+{
+    uint8_t duty = s_night_light_on ? s_night_light_brightness : 0;
+    led_driver_set_channel(LED_CHANNEL_BLUE, duty);
+}
 
 int app_driver_init()
 {
     printf("%s: Initializing light driver\n", TAG);
+
     light_driver_config_t cfg = {
         .device_type = LIGHT_DEVICE_TYPE_LED,
         .channel_comb = LIGHT_CHANNEL_COMB_2CH_CW,
-        .io_conf = {
-            .led_io = {
-                .cold = COLD_CHANNEL_IO,
-                .warm = WARM_CHANNEL_IO,
-            },
+        .io_conf.led_io = {
+            .cold = LIGHT_CW_PWM_GPIO_COLD,
+            .warm = LIGHT_CW_PWM_GPIO_WARM,
         },
         .min_brightness = 0,
         .max_brightness = 100,
     };
-    light_driver_init(&cfg);
+
+    if (light_driver_init(&cfg) != 0) {
+        printf("%s: Failed to initialize main light driver\n", TAG);
+        return -1;
+    }
+
+    if (led_driver_regist_channel(LED_CHANNEL_BLUE, LIGHT_C_PWM_GPIO_DEDICATED) != 0) {
+        printf("%s: Failed to register nightlight channel\n", TAG);
+        return -1;
+    }
+
+    s_night_light_on = false;
+    s_night_light_brightness = 100;
+    app_driver_update_nightlight();
+
     light_driver_set_temperature(4000);
     light_driver_set_brightness(100);
-    light_driver_set_power(true);
+    light_driver_set_power(1);
+
     return 0;
 }
 
 int app_driver_set_light_state(bool state)
 {
-    printf("%s: Setting light state: %s\n", TAG, state ? "ON" : "OFF");
+    printf("%s: Setting main light state: %s\n", TAG, state ? "ON" : "OFF");
     return light_driver_set_power(state);
 }
 
 int app_driver_set_light_brightness(uint8_t brightness)
 {
-    brightness = brightness * 100 / 255;
-    printf("%s: Setting light brightness: %d\n", TAG, brightness);
-    return light_driver_set_brightness(brightness);
+    uint8_t mapped_brightness = brightness * 100 / 255;
+    printf("%s: Setting main light brightness: %d\n", TAG, mapped_brightness);
+    return light_driver_set_brightness(mapped_brightness);
 }
 
 int app_driver_set_light_temperature(uint16_t temperature)
 {
-    temperature = 1000000 / temperature;
-    printf("%s: Setting light temperature: %d\n", TAG, temperature);
-    return light_driver_set_temperature(temperature);
+    uint32_t temperature_kelvin = 1000000 / temperature;
+    printf("%s: Setting main light temperature: %d\n", TAG, temperature_kelvin);
+    return light_driver_set_temperature(temperature_kelvin);
+}
+
+int app_driver_set_c_light_state(bool state)
+{
+    printf("%s: Setting nightlight state: %s\n", TAG, state ? "ON" : "OFF");
+    s_night_light_on = state;
+    app_driver_update_nightlight();
+    return 0;
+}
+
+int app_driver_set_c_light_brightness(uint8_t brightness)
+{
+    s_night_light_brightness = brightness * 100 / 255;
+    printf("%s: Setting nightlight brightness: %d\n", TAG, s_night_light_brightness);
+    app_driver_update_nightlight();
+    return 0;
 }
 
 int app_driver_event_handler(low_code_event_t *event)
 {
-    /* Get the events. Approriate indicators should be shown to the user based on the event. */
+    /* Get the events. Appropriate indicators should be shown to the user based on the event. */
     printf("%s: Received event: %d\n", TAG, event->event_type);
     light_effect_config_t effect_config = {
         .type = LIGHT_EFFECT_INVALID,
@@ -76,17 +118,14 @@ int app_driver_event_handler(low_code_event_t *event)
         .min_brightness = 10
     };
 
-    /* Handle the events */
     switch (event->event_type) {
         case LOW_CODE_EVENT_SETUP_MODE_START:
             printf("%s: Setup mode started\n", TAG);
-            /* Start Indication */
             effect_config.type = LIGHT_EFFECT_BLINK;
             light_driver_effect_start(&effect_config, 2000, 120000);
             break;
         case LOW_CODE_EVENT_SETUP_MODE_END:
             printf("%s: Setup mode ended\n", TAG);
-            /* Stop Indication */
             light_driver_effect_stop();
             break;
         case LOW_CODE_EVENT_SETUP_DEVICE_CONNECTED:
